@@ -56,11 +56,11 @@ def save_error_plot(model, X_test, Y_test, u_test, device, save_dir, filename, s
         fig.savefig(file_path)
         plt.close()
 
-def evaluate_model(model, x, y, u_gt, type="rmse"):
+def evaluate_model(model, x, y, u_gt, error_type="rmse"):
     model.eval()
     inputs = [x.flatten(0).unsqueeze(-1), y.flatten(0).unsqueeze(-1)]
     u_pred = model(inputs[0], inputs[1]).reshape(u_gt.shape)
-    match type:
+    match error_type:
         case "rmse":
             error = calculate_rmse(u_pred, u_gt)
         case "rl2":
@@ -69,7 +69,7 @@ def evaluate_model(model, x, y, u_gt, type="rmse"):
             error = calculate_l2_error(u_pred, u_gt)
         case _:
             error = None
-    return
+    return error
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

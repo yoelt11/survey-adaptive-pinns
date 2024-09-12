@@ -45,6 +45,7 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
     for idx, parameter in enumerate(parameters):
         _ = print_trainable_parameters(model)
         optimizer = optim.AdamW(model.parameters(), lr=lr)
+        loss_per_parameter = []
         for e  in range(epochs):
             optimizer.zero_grad()
             # Compute loss
@@ -55,13 +56,14 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
             # Print loss at specified intervals
             if (e + 1) % print_interval == 0:
                 print(f'[Inner Epoch] [{e + 1}/{epochs}], Loss: {loss.item():.4f}')
+            loss_per_parameter.append(loss.item())
 
         # save plots
         save_comparison_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"u_pred_vs_u_gt_{parameter:3f}.png")
         save_error_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"error_plot_{parameter:.3f}.png")
         rl2.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], type="rl2"))
         rmse.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], type="rmse"))
-        losses.append(loss.item())
+        losses.append(loss_per_parameter)
 
     average_time  = (time.time() - time_start) / parameters.size(0)
     model_parameters = print_trainable_parameters(model)
