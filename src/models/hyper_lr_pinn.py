@@ -55,10 +55,14 @@ class LR_PINN(nn.Module):
         self.relu = nn.ReLU()
 
         self.phase = phase
+        self.meta_param = None
 
-    def forward_phase1(self, x, t, meta_param):
+    def set_task(self, parameter, device):
+        self.meta_param = parameter.to(device)
+
+    def forward_phase1(self, x, t):
         # Meta-learning part (Phase1)
-        meta_output = self.meta_layer_1(meta_param)
+        meta_output = self.meta_layer_1(self.meta_param)
         meta_output = self.tanh(meta_output)
         meta_output = self.meta_layer_2(meta_output)
         meta_output = self.tanh(meta_output)
@@ -97,7 +101,7 @@ class LR_PINN(nn.Module):
 
         return emb_out
 
-    def forward_phase2(self, x, t, meta_param=None):
+    def forward_phase2(self, x, t):
         # Main neural network (Phase2)
         weight_0 = torch.matmul(torch.matmul(self.col_basis_0, torch.diag(self.alpha_0)), self.row_basis_0)
         weight_1 = torch.matmul(torch.matmul(self.col_basis_1, torch.diag(self.alpha_1)), self.row_basis_1)
@@ -119,16 +123,16 @@ class LR_PINN(nn.Module):
         emb_out = self.end_layer(emb_out)
         return emb_out
 
-    def forward(self, x, t, meta_param):
+    def forward(self, x, t):
         if self.phase == 'phase1':
-            return self.forward_phase1(x, t, meta_param)
+            return self.forward_phase1(x, t)
         elif self.phase == 'phase2':
             return self.forward_phase2(x, t)
 
     def get_phase2_weights(self, meta_param):
         """Extracts weights from Phase1 to initialize Phase2"""
         # Meta-learning to get the alphas (same as in Phase1 forward)
-        meta_output = self.meta_layer_1(meta_param)
+        meta_output = self.meta_layer_1(meta_param.unsqueeze(-1))
         meta_output = self.tanh(meta_output)
         meta_output = self.meta_layer_2(meta_output)
         meta_output = self.tanh(meta_output)
@@ -159,3 +163,39 @@ class LR_PINN(nn.Module):
             'alpha_1': alpha_1,
             'alpha_2': alpha_2
         }
+
+def create_phase2_model(phase1_model, meta_param, hidden_dim):
+    """
+    Creates and returns an LR_PINN model for phase 2 using weights from the phase 1 model.
+
+    Args:
+    - phase1_model (nn.Module): The trained Phase 1 model.
+    - meta_param (torch.Tensor): The meta-parameters for phase 2.
+    - hidden_dim (int): The dimension of the hidden layer.
+
+    Returns:
+    - LR_PINN: An instance of the LR_PINN model for phase 2.
+    """
+    # Get phase 2 weights from the phase 1 model using meta parameters
+    phase2_weights = phase1_model.get_phase2_weights(meta_param)
+
+    # Initialize the Phase 2 model with the retrieved weights
+    phase2_model = LR_PINN(
+        hidden_dim=hidden_dim,
+        phase='phase2',
+        start_w=phase2_weights['start_w'],
+        start_b=phase2_weights['start_b'],
+        end_w=phase2_weights['end_w'],
+        end_b=phase2_weights['end_b'],
+        col_0=phase2_weights['col_0'],
+        col_1=phase2_weights['col_1'],
+        col_2=phase2_weights['col_2'],
+        row_0=phase2_weights['row_0'],
+        row_1=phase2_weights['row_1'],
+        row_2=phase2_weights['row_2'],
+        alpha_0=phase2_weights['alpha_0'],
+        alpha_1=phase2_weights['alpha_1'],
+        alpha_2=phase2_weights['alpha_2']
+    )
+
+    return phase2_model
