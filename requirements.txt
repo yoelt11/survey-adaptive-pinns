@@ -1,0 +1,10 @@
+jupyter==1.0.0
+matplotlib==3.8.0
+networkx==3.3
+numpy==1.26.1
+opt-einsum==3.3.0
+pillow==10.3.0
+pytoml==0.1.21
+scipy==1.13.1
+toml==0.10.2
+torch==2.4.0
