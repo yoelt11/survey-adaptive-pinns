@@ -33,8 +33,8 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
     model.train()
     device = inputs[0].device
 
-    X_test = inputs[0]#.reshape(solution_shape)
-    Y_test = inputs[1]#.reshape(solution_shape)
+    X_test = inputs[0].reshape(solution_shape)
+    Y_test = inputs[1].reshape(solution_shape)
 
     rmse = []
     rl2 = []
