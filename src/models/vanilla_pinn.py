@@ -14,7 +14,6 @@ class PINN(nn.Module):
             self.layers.append(nn.Linear(n_neurons, n_neurons))
 
         self.layers.append(nn.Linear(n_neurons, 1))
-
     
     def reinitialize_weights(self):
         for layer in self.layers:
@@ -23,7 +22,6 @@ class PINN(nn.Module):
                 nn.init.xavier_uniform_(layer.weight)
                 if layer.bias is not None:
                     nn.init.zeros_(layer.bias)
-
 
     def forward(self, x, y):
         inputs = torch.cat([x, y], dim=-1)

@@ -63,12 +63,9 @@ class LR_PINN(nn.Module):
 
     def forward_phase1(self, x, t):
         # Meta-learning part (Phase1)
-        meta_output = self.meta_layer_1(self.meta_param)
-        meta_output = self.tanh(meta_output)
-        meta_output = self.meta_layer_2(meta_output)
-        meta_output = self.tanh(meta_output)
-        meta_output = self.meta_layer_3(meta_output)
-        meta_output = self.tanh(meta_output)
+        meta_output = self.tanh(self.meta_layer_1(self.meta_param))
+        meta_output = self.tanh(self.meta_layer_2(meta_output))
+        meta_output = self.tanh(self.meta_layer_3(meta_output))
 
         meta_alpha_0_output = self.relu(self.meta_alpha_0(meta_output)).squeeze(0)
         meta_alpha_1_output = self.relu(self.meta_alpha_1(meta_output)).squeeze(0)
@@ -84,29 +81,21 @@ class LR_PINN(nn.Module):
         weight_1 = torch.matmul(torch.matmul(self.col_basis_1, alpha_1), self.row_basis_1.T)
         weight_2 = torch.matmul(torch.matmul(self.col_basis_2, alpha_2), self.row_basis_2.T)
 
-        emb_out = self.start_layer(inputs)
-        emb_out = self.tanh(emb_out)
-        emb_out = emb_out#.unsqueeze(dim=1)
+        emb_out = self.tanh(self.start_layer(inputs))
 
-        emb_out = torch.matmul(emb_out, weight_0)
-        emb_out = self.tanh(emb_out)
-
-        emb_out = torch.matmul(emb_out, weight_1)
-        emb_out = self.tanh(emb_out)
-
-        emb_out = torch.matmul(emb_out, weight_2)
-        emb_out = self.tanh(emb_out)
+        emb_out = self.tanh(torch.matmul(emb_out, weight_0))
+        emb_out = self.tanh(torch.matmul(emb_out, weight_1))
+        emb_out = self.tanh(torch.matmul(emb_out, weight_2))
 
         emb_out = self.end_layer(emb_out)
-        emb_out = emb_out.squeeze(dim=1)
 
         return emb_out
 
     def forward_phase2(self, x, t):
         # Main neural network (Phase2)
-        weight_0 = torch.matmul(torch.matmul(self.col_basis_0, torch.diag(self.alpha_0)), self.row_basis_0)
-        weight_1 = torch.matmul(torch.matmul(self.col_basis_1, torch.diag(self.alpha_1)), self.row_basis_1)
-        weight_2 = torch.matmul(torch.matmul(self.col_basis_2, torch.diag(self.alpha_2)), self.row_basis_2)
+        weight_0 = torch.matmul(torch.matmul(self.col_basis_0, torch.diag(self.alpha_0)), self.row_basis_0.T)
+        weight_1 = torch.matmul(torch.matmul(self.col_basis_1, torch.diag(self.alpha_1)), self.row_basis_1.T)
+        weight_2 = torch.matmul(torch.matmul(self.col_basis_2, torch.diag(self.alpha_2)), self.row_basis_2.T)
 
         inputs = torch.cat([x, t], axis=1)
         emb_out = self.start_layer(inputs)
@@ -165,7 +154,7 @@ class LR_PINN(nn.Module):
             'alpha_2': alpha_2
         }
 
-def create_phase2_model(phase1_model, meta_param, hidden_dim):
+def create_phase2_model(phase1_model, meta_param, hidden_dim, rank):
     """
     Creates and returns an LR_PINN model for phase 2 using weights from the phase 1 model.
 
@@ -183,6 +172,7 @@ def create_phase2_model(phase1_model, meta_param, hidden_dim):
     # Initialize the Phase 2 model with the retrieved weights
     phase2_model = LR_PINN(
         hidden_dim=hidden_dim,
+        rank=rank,
         phase='phase2',
         start_w=phase2_weights['start_w'],
         start_b=phase2_weights['start_b'],
