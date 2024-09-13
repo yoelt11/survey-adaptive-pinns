@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class LR_PINN(nn.Module):
-    def __init__(self, hidden_dim, phase='phase1', start_w=None, start_b=None, end_w=None, end_b=None,
+    def __init__(self, hidden_dim, rank, phase='phase1', start_w=None, start_b=None, end_w=None, end_b=None,
                  col_0=None, col_1=None, col_2=None, row_0=None, row_1=None, row_2=None,
                  alpha_0=None, alpha_1=None, alpha_2=None):
         super(LR_PINN, self).__init__()
@@ -12,25 +12,26 @@ class LR_PINN(nn.Module):
         self.end_layer = nn.Linear(hidden_dim, 1)
 
         self.hidden_dim = hidden_dim
+        self.rank = rank
         self.scale = 1 / hidden_dim
 
         # Phase1-specific parameters
         if phase == 'phase1':
-            self.col_basis_0 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.hidden_dim))
-            self.col_basis_1 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.hidden_dim))
-            self.col_basis_2 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.hidden_dim))
+            self.col_basis_0 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.rank))
+            self.col_basis_1 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.rank))
+            self.col_basis_2 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.rank))
 
-            self.row_basis_0 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.hidden_dim))
-            self.row_basis_1 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.hidden_dim))
-            self.row_basis_2 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.hidden_dim))
+            self.row_basis_0 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.rank))
+            self.row_basis_1 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.rank))
+            self.row_basis_2 = nn.Parameter(self.scale * torch.rand(self.hidden_dim, self.rank))
 
             self.meta_layer_1 = nn.Linear(1, self.hidden_dim)  # Single parameter instead of three
             self.meta_layer_2 = nn.Linear(self.hidden_dim, self.hidden_dim)
-            self.meta_layer_3 = nn.Linear(self.hidden_dim, self.hidden_dim)
+            self.meta_layer_3 = nn.Linear(self.hidden_dim, self.rank)
 
-            self.meta_alpha_0 = nn.Linear(self.hidden_dim, self.hidden_dim)
-            self.meta_alpha_1 = nn.Linear(self.hidden_dim, self.hidden_dim)
-            self.meta_alpha_2 = nn.Linear(self.hidden_dim, self.hidden_dim)
+            self.meta_alpha_0 = nn.Linear(self.rank, self.rank)
+            self.meta_alpha_1 = nn.Linear(self.rank, self.rank)
+            self.meta_alpha_2 = nn.Linear(self.rank, self.rank)
 
         # Phase2-specific parameters
         if phase == 'phase2':
@@ -69,9 +70,9 @@ class LR_PINN(nn.Module):
         meta_output = self.meta_layer_3(meta_output)
         meta_output = self.tanh(meta_output)
 
-        meta_alpha_0_output = self.relu(self.meta_alpha_0(meta_output))
-        meta_alpha_1_output = self.relu(self.meta_alpha_1(meta_output))
-        meta_alpha_2_output = self.relu(self.meta_alpha_2(meta_output))
+        meta_alpha_0_output = self.relu(self.meta_alpha_0(meta_output)).squeeze(0)
+        meta_alpha_1_output = self.relu(self.meta_alpha_1(meta_output)).squeeze(0)
+        meta_alpha_2_output = self.relu(self.meta_alpha_2(meta_output)).squeeze(0)
 
         alpha_0 = torch.diag_embed(meta_alpha_0_output)
         alpha_1 = torch.diag_embed(meta_alpha_1_output)
@@ -79,21 +80,21 @@ class LR_PINN(nn.Module):
 
         # Main neural network (Phase1)
         inputs = torch.cat([x, t], axis=1)
-        weight_0 = torch.matmul(torch.matmul(self.col_basis_0, alpha_0), self.row_basis_0)
-        weight_1 = torch.matmul(torch.matmul(self.col_basis_1, alpha_1), self.row_basis_1)
-        weight_2 = torch.matmul(torch.matmul(self.col_basis_2, alpha_2), self.row_basis_2)
+        weight_0 = torch.matmul(torch.matmul(self.col_basis_0, alpha_0), self.row_basis_0.T)
+        weight_1 = torch.matmul(torch.matmul(self.col_basis_1, alpha_1), self.row_basis_1.T)
+        weight_2 = torch.matmul(torch.matmul(self.col_basis_2, alpha_2), self.row_basis_2.T)
 
         emb_out = self.start_layer(inputs)
         emb_out = self.tanh(emb_out)
-        emb_out = emb_out.unsqueeze(dim=1)
+        emb_out = emb_out#.unsqueeze(dim=1)
 
-        emb_out = torch.bmm(emb_out, weight_0)
+        emb_out = torch.matmul(emb_out, weight_0)
         emb_out = self.tanh(emb_out)
 
-        emb_out = torch.bmm(emb_out, weight_1)
+        emb_out = torch.matmul(emb_out, weight_1)
         emb_out = self.tanh(emb_out)
 
-        emb_out = torch.bmm(emb_out, weight_2)
+        emb_out = torch.matmul(emb_out, weight_2)
         emb_out = self.tanh(emb_out)
 
         emb_out = self.end_layer(emb_out)

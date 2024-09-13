@@ -13,7 +13,8 @@ def pre_train(model, inputs, f, parameters, solution_shape, loss_fn, inner_epoch
         print(f"[INFO] Outer Epoch: {oe + 1}/{outer_epochs}")
         for param_idx, param in enumerate(parameters):
             #print(f"[INFO] Training parameter {param_idx + 1}/{len(parameters)}: {param}")
-            model.set_task(param.repeat(inputs[0].size(0), 1), device)
+            #model.set_task(param.repeat(inputs[0].size(0), 1), device)
+            model.set_task(param.reshape(-1, 1), device)
             optimizer = optim.AdamW(model.parameters(), lr=lr)
             for ie in range(inner_epochs):
                 optimizer.zero_grad()
@@ -46,6 +47,8 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
 
     time_start = time.time()
     for idx, parameter in enumerate(parameters):
+        model.reinitialize_weights()
+        print("model-reinit")
         _ = print_trainable_parameters(model)
         optimizer = optim.AdamW(model.parameters(), lr=lr)
         loss_per_parameter = []
@@ -90,6 +93,10 @@ def fine_tune_meta(model, inputs, f, loss_fn, parameters, epochs, solutions, sol
 
     X_test = inputs[0].reshape(solution_shape)
     Y_test = inputs[1].reshape(solution_shape)
+    
+    inputs[0] = X_test[::2].reshape(-1, 1)
+    inputs[1] = Y_test[::2].reshape(-1, 1)
+    reduced_solution_shape = X_test[::2].shape
 
     rmse = []
     rl2 = []
@@ -105,7 +112,7 @@ def fine_tune_meta(model, inputs, f, loss_fn, parameters, epochs, solutions, sol
         for e  in range(epochs):
             optimizer.zero_grad()
             # Compute loss
-            loss = loss_fn(model, inputs, f, parameter, solution_shape)
+            loss = loss_fn(model, inputs, f, parameter, reduced_solution_shape)
             # Backpropagation
             loss.backward()
             optimizer.step()
@@ -117,8 +124,8 @@ def fine_tune_meta(model, inputs, f, loss_fn, parameters, epochs, solutions, sol
         # save plots
         save_comparison_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"u_pred_vs_u_gt_{parameter:3f}.png")
         save_error_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"error_plot_{parameter:.3f}.png")
-        rl2.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], error_type="rl2"))
-        rmse.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], error_type="rmse"))
+        rl2.append(evaluate_model(model, X_test.reshape(-1, 1), Y_test.reshape(-1, 1), solutions[idx], error_type="rl2"))
+        rmse.append(evaluate_model(model, X_test.reshape(-1, 1), Y_test.reshape(-1, 1), solutions[idx], error_type="rmse"))
         losses.append(loss_per_parameter)
 
     average_time  = (time.time() - time_start) / parameters.size(0)
