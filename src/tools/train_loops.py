@@ -50,6 +50,8 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
     epochs_2_target = []
     time_2_target = []
     target_loss = 0.05
+    loss_at_target = []
+    error_at_target = []
     
     time_per_param = []
 
@@ -81,18 +83,22 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
                 time_2_target.append(time.time() - time_start)
                 epochs_2_target.append(e)
                 print(f"[INFO] target reached, epochs: {e}, time: {time_2_target[-1]}")
+                loss_at_target.append(loss.item())
+                error_at_target.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], error_type="rl2"))
 
             if not target_recorded and e == (epochs - 1):
                 print("[INFO] target not reached")
                 time_2_target.append(time.time() - time_start)
                 epochs_2_target.append(e)
+                loss_at_target.append(loss.item())
+                error_at_target.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], error_type="rl2"))
 
         time_per_param.append(time.time() - time_start)
         print("[INFO] time per parameter: ", time.time()-time_start)
         
         # save plots
-        save_comparison_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"u_pred_vs_u_gt_{parameter:3f}.png")
-        save_error_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"error_plot_{parameter:.3f}.png")
+        save_comparison_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"u_pred_vs_u_gt_{parameter:3f}.pdf")
+        save_error_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"error_plot_{parameter:.3f}.pdf")
         rl2.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], error_type="rl2"))
         rmse.append(evaluate_model(model, inputs[0], inputs[1], solutions[idx], error_type="rmse"))
         losses.append(loss_per_parameter)
@@ -112,7 +118,9 @@ def fine_tune(model, inputs, f, loss_fn, parameters, epochs, solutions, solution
         "points": n_collocation,
         "epochs": epochs,
         "time2target": time_2_target,
-        "epochs2target": epochs_2_target
+        "epochs2target": epochs_2_target,
+        "lossattarget": loss_at_target,
+        "errorrattarget": error_at_target
         }
 
     return model, metrics
@@ -136,6 +144,8 @@ def fine_tune_meta(model, inputs, f, loss_fn, parameters, epochs, solutions, sol
     epochs_2_target = []
     time_2_target = []
     target_loss = 0.05
+    loss_at_target = []
+    error_at_target = []
 
     time_per_param = []
 
@@ -166,18 +176,22 @@ def fine_tune_meta(model, inputs, f, loss_fn, parameters, epochs, solutions, sol
                 time_2_target.append(time.time() - time_start)
                 epochs_2_target.append(e)
                 print(f"[INFO] target reached, epochs: {e}, time: {time_2_target[-1]}")
+                loss_at_target.append(loss.item())
+                error_at_target.append(evaluate_model(model, X_test.reshape(-1, 1), Y_test.reshape(-1, 1), solutions[idx], error_type="rl2"))
 
             if not target_recorded and e == (epochs - 1):
                 print("[INFO] target not reached")
                 time_2_target.append(time.time() - time_start)
                 epochs_2_target.append(e)
+                loss_at_target.append(loss.item())
+                error_at_target.append(evaluate_model(model, X_test.reshape(-1, 1), Y_test.reshape(-1, 1), solutions[idx], error_type="rl2"))
 
         time_per_param.append(time.time() - time_start)
         print("[INFO] time per parameter: ", time.time()-time_start)
 
         # save plots
-        save_comparison_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"u_pred_vs_u_gt_{parameter:3f}.png")
-        save_error_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"error_plot_{parameter:.3f}.png")
+        save_comparison_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"u_pred_vs_u_gt_{parameter:3f}.pdf")
+        save_error_plot(model, X_test, Y_test, solutions[idx].to(device), device, output_dir, f"error_plot_{parameter:.3f}.pdf")
         rl2.append(evaluate_model(model, X_test.reshape(-1, 1), Y_test.reshape(-1, 1), solutions[idx], error_type="rl2"))
         rmse.append(evaluate_model(model, X_test.reshape(-1, 1), Y_test.reshape(-1, 1), solutions[idx], error_type="rmse"))
         losses.append(loss_per_parameter)
@@ -197,7 +211,9 @@ def fine_tune_meta(model, inputs, f, loss_fn, parameters, epochs, solutions, sol
         "points": n_collocation,
         "epochs": epochs,
         "time2target": time_2_target,
-        "epochs2target": epochs_2_target
+        "epochs2target": epochs_2_target,
+        "lossattarget": loss_at_target,
+        "errorrattarget": error_at_target
         }
 
     return model, metrics
